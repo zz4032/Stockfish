@@ -2,6 +2,27 @@ language: cpp
 sudo: required
 dist: trusty
 
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   # via the "travis encrypt" command using the project repo's public key
+   - secure: "PScuOKZzF0YGCkZ4FTnSZ9XTD/zDSdop4F5MDnxgS2HAahKUqvJoQPd/rB1YJ2kfsJyrv9uykcFpRzQGLWz8p/Z3d3cj8oEb/VJAwpdLpwbwvHcCfQSL9vMYfdw/R0z23kvu6A6+VQuZPyhg/sQI59GuwBlBBPL2rDD0A1gvYqBzAOEvHSVTsXjFVHQxjEXnGk59SZZ7xOaHPw6yrsK7KnCJ2taio1T71ZXy5ayu23aTdFMfwuhXkFtI/TFNsu+7HcoLOU9yItDCbahehNcZ2kBaltaoweB89rUwBzC6MbPG35XuW9aODcbtz3WNFTHcRGnIfPJ40lSQu6NqphiS1giM04/Oz156Ukzhz80jKLSwrjX/Kh8O1Sr5na3kMQYKMgBFp6iXr5vbqGYmEvJxE4WISX4lcEg3cAeFTi5WLin5ZAHQCwhTOt/Yu4UvGbWKnKWY8Ii2JrqZ0JYGdH3R+mxHXcjg7p1NPXwti8Azh0ENt7aU+Fny+2TxACfj/+8wX4PE0xKHge2YL+xD+PZUNJoZLCseBv8qe/OvAJ61Qr31Ywhoch0s3K76R3slxU59o4Y5CWAyuKkiUum2gQDh/Ebc/n7yIsZeMbEuDy3DoOdNnSdEsotS9VAeI5wd6EeN+n0Vk7RW9xyajSgtEjRmDRVShQn5nGqQF2OdiDWm6SE="
+
+before_install:
+      # Exit immediately if the branch is the "coverity_scan" branch and the job number is not 1
+      - test "${TRAVIS_BRANCH}" != "coverity_scan" -o "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
+      - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
+
+addons:
+  coverity_scan:
+    project:
+      name: "official-stockfish/Stockfish"
+      description: "Coverity via Travis CI"
+    notification_email: mcostalba@gmail.com
+    build_command_prepend: "make clean"
+    build_command: "make build ARCH=x86-64"
+    branch_pattern: coverity_scan
+
 matrix:
   include:
     - os: linux
@@ -39,11 +60,14 @@ matrix:
 branches:
   only:
    - master
+   - coverity_scan
 
 before_script:
   - cd src
 
 script:
+  # do not build and test the project if we're running Coverity Scan
+  - test "${TRAVIS_BRANCH}" != "coverity_scan" || exit 0
   - make clean && make build ARCH=x86-64 && ./stockfish bench 2>&1 >/dev/null | grep 'Nodes searched' | tee bench1
   - make clean && make build ARCH=x86-32 && ./stockfish bench 2>&1 >/dev/null | grep 'Nodes searched' | tee bench2
   - echo "Checking for same bench numbers..."
